@@ -1,18 +1,19 @@
-import './globals.css'
-import { Inter } from 'next/font/google'
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import "./globals.css"
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: 'Telecom Sales App',
-  description: 'A telecom sales application for managing orders and customers',
+export const metadata: Metadata = {
+  title: "מערכת מכירות טלקום",
+  description: "מערכת ניהול מכירות טלקום",
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
     <html lang="he" dir="rtl">
       <body className={inter.className}>{children}</body>

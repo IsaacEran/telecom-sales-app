@@ -8,14 +8,13 @@ interface JsonData {
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 
-export async function readJSON(filename: string): Promise<JsonData[]> {
-  const filePath = path.join(DATA_DIR, filename)
+export const readJSON = async (filename: string) => {
   try {
-    const fileContent = await fs.readFile(filePath, 'utf-8')
-    return JSON.parse(fileContent)
+    const data = await import(`@/data/${filename}`)
+    return data.default
   } catch (error) {
-    console.error(`Error reading JSON file ${filename}:`, error)
-    return []
+    console.error(`Error reading ${filename}:`, error)
+    throw error
   }
 }
 

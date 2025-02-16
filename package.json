@@ -16,7 +16,10 @@
     "tailwindcss": "^3.4.1",
     "csv-parser": "^3.0.0",
     "node-fetch": "^3.3.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-command": "^1.0.0",
+    "cmdk": "^0.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.57",
