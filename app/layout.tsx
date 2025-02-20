@@ -5,8 +5,11 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "מערכת מכירות טלקום",
-  description: "מערכת ניהול מכירות טלקום",
+  title: {
+    default: 'דף הבית | מערכת מכירות טלקום',
+    template: '%s | מערכת מכירות טלקום'
+  },
+  description: 'מערכת ניהול מכירות טלקום - ניהול הזמנות, לקוחות ומוצרים במקום אחד',
 }
 
 export default function RootLayout({
