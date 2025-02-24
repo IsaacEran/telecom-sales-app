@@ -156,7 +156,7 @@ export default function NewOrder() {
   }
 
   const updateBranch = (index: number, field: keyof Branch, value: string) => {
-    const updatedBranches = newCustomer.branches.map((branch, i) => 
+    const updatedBranches = newCustomer.branches.map((branch, i) =>
       i === index ? { ...branch, [field]: value } : branch
     )
     setNewCustomer({ ...newCustomer, branches: updatedBranches })
@@ -221,7 +221,7 @@ export default function NewOrder() {
       // Clear any previous errors
       setErrors({})
       setStep(2)
-      
+
       // If it's an existing customer, skip branch step
       if (customerType === 'existing') {
         setStep(3)
@@ -309,7 +309,7 @@ export default function NewOrder() {
 
       console.log('Submitting order data:', orderData);
       await appendToJSON("orders.json", orderData);
-      
+
       setShowConfirmation(true);
       setTimeout(() => {
         setShowConfirmation(false);
@@ -324,7 +324,7 @@ export default function NewOrder() {
   };
 
   const filteredProducts = (searchTerm: string) => {
-    return products.filter(product => 
+    return products.filter(product =>
       product.Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product["Product Type"].toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -373,10 +373,10 @@ export default function NewOrder() {
 
                   {customerType === 'existing' && (
                     <div className="space-y-4">
-                      <CustomerSelect 
-                        onSelect={(company) => setSelectedCompany(company)} 
+                      <CustomerSelect
+                        onSelect={(company) => setSelectedCompany(company)}
                       />
-                      
+
                       {selectedCompany && (
                         <div className="p-4 border rounded-lg bg-muted">
                           <h3 className="font-semibold mb-2">פרטי לקוח:</h3>
@@ -447,7 +447,7 @@ export default function NewOrder() {
 
                         <div className="space-y-2">
                           <Label htmlFor="internetProvider">ספק אינטרנט</Label>
-                          <Select 
+                          <Select
                             onValueChange={(value) => setNewCustomer({ ...newCustomer, internetProvider: value })}
                           >
                             <SelectTrigger id="internetProvider">
@@ -465,7 +465,7 @@ export default function NewOrder() {
 
                         <div className="space-y-2">
                           <Label htmlFor="businessType">סוג עסק</Label>
-                          <Select 
+                          <Select
                             onValueChange={(value) => setNewCustomer({ ...newCustomer, businessType: value })}
                           >
                             <SelectTrigger id="businessType">
@@ -478,18 +478,53 @@ export default function NewOrder() {
                           </Select>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2 space-x-reverse">
-                            <Checkbox
-                              id="isMultiBranch"
-                              checked={newCustomer.isMultiBranch}
-                              onCheckedChange={(checked: boolean) => 
-                                setNewCustomer({ ...newCustomer, isMultiBranch: checked })
-                              }
-                            />
-                            <Label htmlFor="isMultiBranch">עסק מרובה סניפים</Label>
-                          </div>
+                        <div className="flex items-center space-x-2 space-x-reverse">
+                          <Switch
+                            id="isMultiBranch"
+                            checked={newCustomer.isMultiBranch}
+                            onCheckedChange={(checked) => setNewCustomer({ ...newCustomer, isMultiBranch: checked })}
+                          />
+                          <Label htmlFor="isMultiBranch">לקוח מרובה סניפים</Label>
                         </div>
+
+                        {newCustomer.isMultiBranch && (
+                          <div className="space-y-4 border p-4 rounded">
+                            <h3 className="font-semibold">סניפים</h3>
+                            {newCustomer.branches.map((branch, index) => (
+                              <div key={index} className="space-y-2">
+                                <Label>סניף {index + 1}</Label>
+                                <Input
+                                  placeholder="שם הסניף"
+                                  value={branch.name}
+                                  onChange={(e) => {
+                                    const updatedBranches = [...newCustomer.branches];
+                                    updatedBranches[index].name = e.target.value;
+                                    setNewCustomer({ ...newCustomer, branches: updatedBranches });
+                                  }}
+                                />
+                                <Input
+                                  placeholder="כתובת הסניף"
+                                  value={branch.address}
+                                  onChange={(e) => {
+                                    const updatedBranches = [...newCustomer.branches];
+                                    updatedBranches[index].address = e.target.value;
+                                    setNewCustomer({ ...newCustomer, branches: updatedBranches });
+                                  }}
+                                />
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setNewCustomer({
+                                ...newCustomer,
+                                branches: [...newCustomer.branches, { name: '', address: '' }]
+                              })}
+                            >
+                              הוסף סניף
+                            </Button>
+                          </div>
+                        )}
 
                         <div className="border-t pt-4">
                           <h3 className="font-semibold mb-4">פרטי מורשה חתימה</h3>
@@ -560,8 +595,8 @@ export default function NewOrder() {
                     </div>
                   )}
 
-                  {(customerType === 'existing' && selectedCompany) || 
-                   (customerType === 'new' && newCustomer.name) ? (
+                  {(customerType === 'existing' && selectedCompany) ||
+                    (customerType === 'new' && newCustomer.name) ? (
                     <div className="mt-6 space-y-2">
                       <Label>בחר תכנית תשלומים</Label>
                       <RadioGroup
@@ -599,7 +634,7 @@ export default function NewOrder() {
                         onChange={(e) => updateBranch(index, 'name', e.target.value)}
                       />
                       {errors[`branchName-${index}`] && <p className="text-red-500 text-sm">{errors[`branchName-${index}`]}</p>}
-                      
+
                       <Label htmlFor={`branchAddress-${index}`}>כתובת הסניף</Label>
                       <Input
                         id={`branchAddress-${index}`}
@@ -640,9 +675,9 @@ export default function NewOrder() {
                           מוצר {index + 1}
                         </Label>
                         {index > 0 && (
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
+                          <Button
+                            type="button"
+                            variant="ghost"
                             size="sm"
                             onClick={() => removeOrderItem(index)}
                           >
@@ -652,7 +687,7 @@ export default function NewOrder() {
                       </div>
                       <div className="flex flex-col md:flex-row gap-2">
                         <div className="flex-1">
-                          <Select 
+                          <Select
                             onValueChange={(value) => updateOrderItem(index, 'productId', value)}
                             value={item.productId}
                           >
@@ -670,8 +705,8 @@ export default function NewOrder() {
                               </div>
                               <div className="max-h-[300px] overflow-y-auto">
                                 {filteredProducts(productSearch).map((product) => (
-                                  <SelectItem 
-                                    key={product.Name} 
+                                  <SelectItem
+                                    key={product.Name}
                                     value={product.Name}
                                     className="py-3"
                                   >
@@ -720,8 +755,8 @@ export default function NewOrder() {
                     </div>
                   ))}
 
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={addOrderItem}
                     className="mt-4"
@@ -744,7 +779,7 @@ export default function NewOrder() {
           </CardContent>
           <CardFooter className="flex justify-between">
             {step > 1 && (
-              <Button 
+              <Button
                 type="button"
                 onClick={handlePrevStep}
               >
@@ -752,14 +787,14 @@ export default function NewOrder() {
               </Button>
             )}
             {step < 3 ? (
-              <Button 
+              <Button
                 type="button"
                 onClick={handleNextStep}
               >
                 המשך
               </Button>
             ) : (
-              <Button 
+              <Button
                 type="submit"
                 form="orderForm"
                 disabled={isLoading || orderItems.some(item => !item.productId)}
