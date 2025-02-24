@@ -1,13 +1,14 @@
+
 import React from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
 interface HeaderProps {
   title: string
-  backUrl: string
+  backUrl?: string
 }
 
-export function Header({ title, backUrl }: HeaderProps) {
+export function Header({ title, backUrl = "/" }: HeaderProps) {
   return (
     <header className="bg-primary text-primary-foreground p-4">
       <div className="container mx-auto flex items-center justify-between">
@@ -19,4 +20,4 @@ export function Header({ title, backUrl }: HeaderProps) {
       </div>
     </header>
   )
-}     
+}
