@@ -14,7 +14,7 @@ export function CustomerSelect({ onSelect }: CustomerSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null)
-  
+
   const companies = getCompanies()
   const filteredCompanies = companies.filter(company => 
     company["שם העסק"].toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -49,7 +49,7 @@ export function CustomerSelect({ onSelect }: CustomerSelectProps) {
           ) : (
             filteredCompanies.map((company) => (
               <div
-                key={company["ח.פ. או ע.מ"]}
+                key={company["🔒 Row ID"]} // Changed key to use unique identifier
                 className="p-2 hover:bg-gray-100 cursor-pointer"
                 onClick={() => {
                   setSelectedCompany(company)
@@ -69,4 +69,4 @@ export function CustomerSelect({ onSelect }: CustomerSelectProps) {
       )}
     </div>
   )
-} 
+}
