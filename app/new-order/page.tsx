@@ -375,6 +375,8 @@ export default function NewOrder() {
                     <div className="space-y-4">
                       <CustomerSelect
                         onSelect={(company) => setSelectedCompany(company)}
+                        onBranchUpdate={(branches) => setNewCustomer(prev => ({ ...prev, branches, isMultiBranch: true }))}
+                        selectedCompany={selectedCompany}
                       />
 
                       {selectedCompany && (

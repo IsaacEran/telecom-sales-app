@@ -10,12 +10,34 @@ interface CustomerSelectProps {
   onSelect: (company: Company) => void
 }
 
-export function CustomerSelect({ onSelect }: CustomerSelectProps) {
+interface CustomerSelectProps {
+  onSelect: (company: Company) => void;
+  onBranchUpdate?: (branches: Branch[]) => void;
+  selectedCompany?: Company | null;
+}
+
+export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany }: CustomerSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(null)
+  const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(propSelectedCompany || null)
+  const [isMultiBranch, setIsMultiBranch] = React.useState(false)
+  const [branches, setBranches] = React.useState<Branch[]>([])
 
   const companies = getCompanies()
+
+  const addBranch = () => {
+    const newBranches = [...branches, { name: '', address: '' }]
+    setBranches(newBranches)
+    onBranchUpdate?.(newBranches)
+  }
+
+  const updateBranch = (index: number, field: keyof Branch, value: string) => {
+    const newBranches = branches.map((branch, i) =>
+      i === index ? { ...branch, [field]: value } : branch
+    )
+    setBranches(newBranches)
+    onBranchUpdate?.(newBranches)
+  }
   const filteredCompanies = companies.filter(company => 
     company["שם העסק"].toLowerCase().includes(searchQuery.toLowerCase()) ||
     company["ח.פ. או ע.מ"].includes(searchQuery)
@@ -64,6 +86,41 @@ export function CustomerSelect({ onSelect }: CustomerSelectProps) {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {selectedCompany && (
+        <div className="mt-4">
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <Switch
+              id="isMultiBranch"
+              checked={isMultiBranch}
+              onCheckedChange={(checked) => setIsMultiBranch(checked)}
+            />
+            <Label htmlFor="isMultiBranch">לקוח מרובה סניפים</Label>
+          </div>
+
+          {isMultiBranch && (
+            <div className="space-y-4 mt-4">
+              {branches.map((branch, index) => (
+                <div key={index} className="space-y-2 border p-4 rounded">
+                  <Input
+                    placeholder="שם הסניף"
+                    value={branch.name}
+                    onChange={(e) => updateBranch(index, 'name', e.target.value)}
+                  />
+                  <Input
+                    placeholder="כתובת הסניף"
+                    value={branch.address}
+                    onChange={(e) => updateBranch(index, 'address', e.target.value)}
+                  />
+                </div>
+              ))}
+              <Button type="button" onClick={addBranch}>
+                <Plus className="h-4 w-4 mr-2" /> הוסף סניף
+              </Button>
+            </div>
           )}
         </div>
       )}
