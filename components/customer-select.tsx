@@ -1,10 +1,17 @@
 'use client'
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { getCompanies, type Company } from "@/lib/db"
+
+interface Branch {
+  name: string;
+  address: string;
+}
 
 interface CustomerSelectProps {
   onSelect: (company: Company) => void

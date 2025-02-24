@@ -235,6 +235,15 @@ export default function NewOrder() {
     setStep(step - 1)
   }
 
+  const handleBack = () => {
+    if (step === 3) {
+      setStep(2);
+    } else if (step === 2) {
+      setStep(1);
+    }
+  };
+
+
   const handleSubmit = async (e: React.FormEvent<OrderFormElement>) => {
     e.preventDefault();
     console.log('Form submitted', { orderItems, paymentPlan });
@@ -783,7 +792,7 @@ export default function NewOrder() {
             {step > 1 && (
               <Button
                 type="button"
-                onClick={handlePrevStep}
+                onClick={handleBack}
               >
                 חזור
               </Button>
