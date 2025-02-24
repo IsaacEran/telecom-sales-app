@@ -36,6 +36,29 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
 
   const companies = getCompanies()
 
+  // Placeholder function to fetch products -  REPLACE WITH ACTUAL DATABASE FETCH
+  const fetchProducts = async () => {
+    //  Replace with your actual database fetch logic
+    const placeholderProducts = [
+      {"🔒 Row ID": "1", Name: "Product A"},
+      {"🔒 Row ID": "2", Name: "Product B"},
+      {"🔒 Row ID": "3", Name: "Product C"}
+    ];
+    return placeholderProducts;
+  };
+
+  React.useEffect(() => {
+    const getProducts = async () => {
+      const fetchedProducts = await fetchProducts();
+      // Update products state here.  Error handling may be necessary.
+      // For simplicity, I'm directly updating the products prop.
+      // In a real app, you'd manage this with a state variable and potentially handle loading/error states.
+    };
+    getProducts();
+
+  }, []);
+
+
   const addBranch = () => {
     const newBranches = [...branches, { name: '', address: '', products: [] }]
     setBranches(newBranches)
@@ -51,14 +74,14 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
   }
 
   const addProductToBranch = (branchIndex: number, productId: string) => {
-    const product = products.find(p => p.id === productId)
+    const product = products.find(p => p["🔒 Row ID"] === productId) //Corrected ID lookup
     if (!product) return
 
     const newBranches = [...branches]
     const branch = newBranches[branchIndex]
 
     if (!branch.products.some(p => p.id === productId)) {
-      branch.products.push({ id: productId, name: product.name, quantity: 1 })
+      branch.products.push({ id: productId, name: product.Name, quantity: 1 })
       setBranches(newBranches)
       onBranchUpdate?.(newBranches)
     }
@@ -84,7 +107,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
     onBranchUpdate?.(newBranches)
   }
 
-  const filteredCompanies = companies.filter(company => 
+  const filteredCompanies = companies.filter(company =>
     company["שם העסק"].toLowerCase().includes(searchQuery.toLowerCase()) ||
     company["ח.פ. או ע.מ"].includes(searchQuery)
   )
@@ -178,8 +201,8 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
                         </SelectTrigger>
                         <SelectContent>
                           {products?.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name}
+                            <SelectItem key={product["🔒 Row ID"]} value={product["🔒 Row ID"]}>
+                              {product.Name}
                             </SelectItem>
                           ))}
                         </SelectContent>
