@@ -1,29 +1,34 @@
+
 'use client'
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getCompanies, type Company } from "@/lib/db"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Branch {
   name: string;
   address: string;
-}
-
-interface CustomerSelectProps {
-  onSelect: (company: Company) => void
+  products: {
+    id: string;
+    name: string;
+    quantity: number;
+  }[];
 }
 
 interface CustomerSelectProps {
   onSelect: (company: Company) => void;
   onBranchUpdate?: (branches: Branch[]) => void;
   selectedCompany?: Company | null;
+  products: Array<{ id: string; name: string; }>;
 }
 
-export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany }: CustomerSelectProps) {
+export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany, products }: CustomerSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(propSelectedCompany || null)
@@ -33,7 +38,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
   const companies = getCompanies()
 
   const addBranch = () => {
-    const newBranches = [...branches, { name: '', address: '' }]
+    const newBranches = [...branches, { name: '', address: '', products: [] }]
     setBranches(newBranches)
     onBranchUpdate?.(newBranches)
   }
@@ -45,6 +50,41 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
     setBranches(newBranches)
     onBranchUpdate?.(newBranches)
   }
+
+  const addProductToBranch = (branchIndex: number, productId: string) => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+
+    const newBranches = [...branches]
+    const branch = newBranches[branchIndex]
+    
+    if (!branch.products.some(p => p.id === productId)) {
+      branch.products.push({ id: productId, name: product.name, quantity: 1 })
+      setBranches(newBranches)
+      onBranchUpdate?.(newBranches)
+    }
+  }
+
+  const updateProductQuantity = (branchIndex: number, productId: string, quantity: number) => {
+    const newBranches = [...branches]
+    const branch = newBranches[branchIndex]
+    const product = branch.products.find(p => p.id === productId)
+    
+    if (product) {
+      product.quantity = quantity
+      setBranches(newBranches)
+      onBranchUpdate?.(newBranches)
+    }
+  }
+
+  const removeProduct = (branchIndex: number, productId: string) => {
+    const newBranches = [...branches]
+    const branch = newBranches[branchIndex]
+    branch.products = branch.products.filter(p => p.id !== productId)
+    setBranches(newBranches)
+    onBranchUpdate?.(newBranches)
+  }
+
   const filteredCompanies = companies.filter(company => 
     company["שם העסק"].toLowerCase().includes(searchQuery.toLowerCase()) ||
     company["ח.פ. או ע.מ"].includes(searchQuery)
@@ -78,7 +118,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
           ) : (
             filteredCompanies.map((company) => (
               <div
-                key={company["🔒 Row ID"]} // Changed key to use unique identifier
+                key={company["🔒 Row ID"]}
                 className="p-2 hover:bg-gray-100 cursor-pointer"
                 onClick={() => {
                   setSelectedCompany(company)
@@ -110,19 +150,66 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
 
           {isMultiBranch && (
             <div className="space-y-4 mt-4">
-              {branches.map((branch, index) => (
-                <div key={index} className="space-y-2 border p-4 rounded">
-                  <Input
-                    placeholder="שם הסניף"
-                    value={branch.name}
-                    onChange={(e) => updateBranch(index, 'name', e.target.value)}
-                  />
-                  <Input
-                    placeholder="כתובת הסניף"
-                    value={branch.address}
-                    onChange={(e) => updateBranch(index, 'address', e.target.value)}
-                  />
-                </div>
+              {branches.map((branch, branchIndex) => (
+                <Card key={branchIndex} className="p-4">
+                  <CardHeader>
+                    <CardTitle className="text-lg">סניף {branchIndex + 1}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="שם הסניף"
+                        value={branch.name}
+                        onChange={(e) => updateBranch(branchIndex, 'name', e.target.value)}
+                      />
+                      <Input
+                        placeholder="כתובת הסניף"
+                        value={branch.address}
+                        onChange={(e) => updateBranch(branchIndex, 'address', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>מוצרים</Label>
+                      <Select
+                        onValueChange={(value) => addProductToBranch(branchIndex, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="בחר מוצר" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="space-y-2 mt-2">
+                        {branch.products.map((product) => (
+                          <div key={product.id} className="flex items-center gap-2 p-2 border rounded">
+                            <span className="flex-grow">{product.name}</span>
+                            <Input
+                              type="number"
+                              value={product.quantity}
+                              onChange={(e) => updateProductQuantity(branchIndex, product.id, parseInt(e.target.value) || 0)}
+                              className="w-20"
+                              min="1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeProduct(branchIndex, product.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
               <Button type="button" onClick={addBranch}>
                 <Plus className="h-4 w-4 mr-2" /> הוסף סניף
