@@ -1,23 +1,31 @@
 'use client'
 
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ArrowRight, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getCompanies, type Company } from "@/lib/db"
 import { LoadingSkeleton } from '@/components/ui/loading'
-import { useTranslations } from 'next-intl'
 
 export default function CompaniesPage() {
   const router = useRouter()
-  const t = useTranslations('Companies')
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const { data: companies, isLoading } = useQuery({
-    queryKey: ['companies'],
-    queryFn: getCompanies
-  })
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const data = await getCompanies()
+        setCompanies(data)
+      } catch (error) {
+        console.error('Error fetching companies:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchCompanies()
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -29,17 +37,17 @@ export default function CompaniesPage() {
             className="flex items-center gap-2"
           >
             <ArrowRight className="h-4 w-4" />
-            {t('backToHome')}
+            חזור לדף הבית
           </Button>
         </div>
       </header>
 
       <main className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{t('title')}</h1>
+          <h1 className="text-2xl font-bold">לקוחות</h1>
           <Button onClick={() => router.push('/companies/new')}>
             <Plus className="h-4 w-4 mr-2" />
-            {t('newCustomer')}
+            לקוח חדש
           </Button>
         </div>
 
@@ -47,7 +55,7 @@ export default function CompaniesPage() {
           <LoadingSkeleton />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {companies?.map((company) => (
+            {companies.map((company) => (
               <Card 
                 key={company["ח.פ. או ע.מ"]} 
                 className="p-4 hover:shadow-lg transition-shadow cursor-pointer"
@@ -57,8 +65,8 @@ export default function CompaniesPage() {
                 <p className="text-sm text-muted-foreground">{company["ח.פ. או ע.מ"]}</p>
                 <div className="mt-2 text-sm">
                   <p>{company["כתובת מלאה"]}</p>
-                  <p>{t('phone')}: {company["טלפון"]}</p>
-                  <p>{t('email')}: {company["מייל בית העסק לחשבוניות"]}</p>
+                  <p>טלפון: {company["טלפון"]}</p>
+                  <p>מייל: {company["מייל בית העסק לחשבוניות"]}</p>
                 </div>
               </Card>
             ))}
