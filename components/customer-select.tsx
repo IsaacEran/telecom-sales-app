@@ -1,4 +1,3 @@
-
 'use client'
 
 import * as React from "react"
@@ -57,7 +56,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
 
     const newBranches = [...branches]
     const branch = newBranches[branchIndex]
-    
+
     if (!branch.products.some(p => p.id === productId)) {
       branch.products.push({ id: productId, name: product.name, quantity: 1 })
       setBranches(newBranches)
@@ -69,7 +68,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
     const newBranches = [...branches]
     const branch = newBranches[branchIndex]
     const product = branch.products.find(p => p.id === productId)
-    
+
     if (product) {
       product.quantity = quantity
       setBranches(newBranches)
@@ -168,7 +167,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
                         onChange={(e) => updateBranch(branchIndex, 'address', e.target.value)}
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>מוצרים</Label>
                       <Select
@@ -178,7 +177,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
                           <SelectValue placeholder="בחר מוצר" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products.map((product) => (
+                          {products?.map((product) => (
                             <SelectItem key={product.id} value={product.id}>
                               {product.name}
                             </SelectItem>
