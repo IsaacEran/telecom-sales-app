@@ -1,4 +1,4 @@
-import pool from './db-client';
+import { getConnectionPool } from './db-client';
 import companies from '@/data/companies.json'
 import products from '@/data/products.json'
 import users from '@/data/users.json'
@@ -59,7 +59,7 @@ export interface OrderItem {
 // Helper functions to fetch data
 export const getCompanies = async (): Promise<Company[]> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM companies');
       return result.rows;
@@ -77,7 +77,7 @@ export const getCompanies = async (): Promise<Company[]> => {
 
 export const getProducts = async (): Promise<Product[]> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM products');
       return result.rows;
@@ -95,7 +95,7 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const getUsers = async (): Promise<User[]> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM users');
       return result.rows;
@@ -114,7 +114,7 @@ export const getUsers = async (): Promise<User[]> => {
 // Helper functions to fetch single items
 export const getCompany = async (id: string): Promise<Company | null> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM companies WHERE "ח.פ. או ע.מ" = $1', [id]);
       if (result.rows.length === 0) {
@@ -135,7 +135,7 @@ export const getCompany = async (id: string): Promise<Company | null> => {
 
 export const getProduct = async (id: string): Promise<Product | null> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM products WHERE "Name" = $1', [id]);
       if (result.rows.length === 0) {
@@ -156,7 +156,7 @@ export const getProduct = async (id: string): Promise<Product | null> => {
 
 export const getUser = async (email: string): Promise<User | null> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM users WHERE "Email" = $1', [email]);
       if (result.rows.length === 0) {
@@ -178,7 +178,7 @@ export const getUser = async (email: string): Promise<User | null> => {
 // Helper functions to search/filter
 export const searchCompanies = async (query: string): Promise<Company[]> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM companies WHERE "שם העסק" ILIKE $1', [`%${query}%`]);
       return result.rows;
@@ -198,7 +198,7 @@ export const searchCompanies = async (query: string): Promise<Company[]> => {
 
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM products WHERE "Name" ILIKE $1', [`%${query}%`]);
       return result.rows;
@@ -219,7 +219,7 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
 export const filterProductsByCategory = async (category: string): Promise<Product[]> => {
   console.log('Filtering products by category:', category);
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       const result = await client.query('SELECT * FROM products WHERE "Product Category" = $1', [category]);
       console.log('Filtered products:', result.rows);
@@ -237,7 +237,7 @@ export const filterProductsByCategory = async (category: string): Promise<Produc
 }
 
 export const createOrder = async (orderData: Order, orderItems: OrderItem[]): Promise<Order | null> => {
-  const client = await pool.connect();
+  const client = await getConnectionPool().connect();
   try {
     // Start transaction
     await client.query('BEGIN');
@@ -274,7 +274,7 @@ export const createOrder = async (orderData: Order, orderItems: OrderItem[]): Pr
 
 export const getOrders = async (): Promise<Order[]> => {
   try {
-    const client = await pool.connect();
+      const client = await getConnectionPool().connect();
     try {
       // Use a JOIN query instead of Supabase's nested queries
       const result = await client.query(`
@@ -315,7 +315,7 @@ export const getOrders = async (): Promise<Order[]> => {
 
 export const getOrderById = async (id: string): Promise<Order | null> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       // Use a JOIN query instead of Supabase's nested queries
       const result = await client.query(`
@@ -359,7 +359,7 @@ export const getOrderById = async (id: string): Promise<Order | null> => {
 
 export const updateOrder = async (id: string, orderData: Partial<Order>): Promise<Order | null> => {
   try {
-    const client = await pool.connect();
+    const client = await getConnectionPool().connect();
     try {
       // Create SET clause dynamically based on provided fields
       const fields = Object.keys(orderData);
@@ -390,7 +390,7 @@ export const updateOrder = async (id: string, orderData: Partial<Order>): Promis
 
 export const deleteOrder = async (id: string): Promise<boolean> => {
   try {
-    const client = await pool.connect();
+      const client = await getConnectionPool().connect();
     try {
       // Start transaction
       await client.query('BEGIN');

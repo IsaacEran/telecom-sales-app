@@ -1,60 +1,41 @@
 import { NextResponse } from 'next/server';
+import { testConnection } from '@/lib/db-client';
 import { getCompanies } from '@/lib/db';
-import pool from '@/lib/db-client';
 
 export async function GET() {
-  try {
-    // Test direct connection first
-    let connectionTest;
-    try {
-      const client = await pool.connect();
-      connectionTest = { success: true, message: 'Database connection successful' };
-      client.release();
-    } catch (connError) {
-      connectionTest = { 
-        success: false, 
-        message: 'Database connection failed',
-        error: connError instanceof Error ? connError.message : 'Unknown error',
-        stack: connError instanceof Error ? connError.stack : null
-      };
-    }
-    
-    // Try to get companies
-    let companiesResult;
+  // Test database connection
+  const connectionTest = await testConnection();
+  
+  // Test companies data access
+  let companiesResult = { success: false, count: 0, sample: [] };
+  if (connectionTest.success) {
     try {
       const companies = await getCompanies();
-      companiesResult = { 
-        success: true, 
+      companiesResult = {
+        success: true,
         count: companies.length,
-        sample: companies.slice(0, 2) // Return just first 2 for sample
+        sample: companies.slice(0, 2) as never[] // Just return a few samples
       };
-    } catch (compError) {
-      companiesResult = { 
-        success: false, 
-        error: compError instanceof Error ? compError.message : 'Unknown error',
-        stack: compError instanceof Error ? compError.stack : null
+    } catch (error) {
+      companiesResult = {
+        success: false,
+        count: 0,
+        sample: []
       };
     }
-    
-    return NextResponse.json({
-      connectionTest,
-      companiesResult,
-      env: {
-        host: process.env.POSTGRES_HOST?.substring(0, 10) + '...',
-        database: process.env.POSTGRES_DATABASE,
-        user: process.env.POSTGRES_USER,
-        ssl: process.env.POSTGRES_SSL
-      }
-    });
-  } catch (error) {
-    console.error('API error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : null
-      }, 
-      { status: 500 }
-    );
   }
+  
+  // Return environment info (without sensitive data)
+  const env = {
+    host: process.env.POSTGRES_HOST?.substring(0, 12) + '...',
+    database: process.env.POSTGRES_DATABASE,
+    user: process.env.POSTGRES_USER?.split('@')[0],
+    ssl: process.env.POSTGRES_SSL
+  };
+  
+  return NextResponse.json({
+    connectionTest,
+    companiesResult,
+    env
+  });
 }
