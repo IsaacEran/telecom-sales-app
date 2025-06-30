@@ -12,14 +12,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Minus, Loader2 } from 'lucide-react'
-import { getCompanies, getProducts, createCompany, createOrder, type Company, type Product } from "@/lib/db"
+import { getCompanies, getProducts, createCompany, createOrder, createOrderItem, createCompanyBranch, getCompanyBranches, type Company, type Product, type CompanyBranch } from "@/lib/db"
 import { supabase } from "@/lib/supabase"
 import { Header } from '@/components/Header'
 import { CustomerSelect } from "@/components/customer-select"
 import type { NewOrderData } from "@/lib/db"
-import type { NewOrderData } from "@/lib/db"
+
 
 interface Branch {
+  id?: string; // UUID when created
   name: string;
   address: string;
 }
@@ -66,6 +67,7 @@ interface ValidationErrors {
   authEmail?: string;
   fetch?: string;
   submit?: string;
+  general?: string;
 }
 
 type PaymentPlan = 'one-time' | '36' | '48';
@@ -96,6 +98,8 @@ export default function NewOrder() {
     branches: [{ name: '', address: '' }]
   })
   const [selectedBranch, setSelectedBranch] = useState(0)
+  // Branch-specific order items: each branch has its own product list
+  const [branchOrderItems, setBranchOrderItems] = useState<Record<number, OrderItem[]>>({})
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ 
     productId: '', 
     quantity: 1, 
@@ -161,19 +165,60 @@ export default function NewOrder() {
     setOrderItems(newOrderItems)
   }
 
+  // Branch-specific order item functions
+  const getCurrentBranchItems = () => {
+    if (!newCustomer.isMultiBranch) return orderItems
+    const items = branchOrderItems[selectedBranch] || [{ 
+      productId: '', 
+      quantity: 1, 
+      id: `item-${Date.now()}` 
+    }]
+    console.log(`Getting items for branch ${selectedBranch}:`, items)
+    return items
+  }
+
+  const updateBranchOrderItems = (branchIndex: number, items: OrderItem[]) => {
+    console.log(`Updating branch ${branchIndex} with items:`, items)
+    setBranchOrderItems(prev => {
+      const newState = {
+        ...prev,
+        [branchIndex]: items
+      }
+      console.log('New branchOrderItems state:', newState)
+      return newState
+    })
+  }
+
+  const addBranchOrderItem = (branchIndex: number) => {
+    const currentItems = branchOrderItems[branchIndex] || []
+    const newItem = { 
+      productId: '', 
+      quantity: 1, 
+      id: `item-${Date.now()}-${Math.random()}` 
+    }
+    updateBranchOrderItems(branchIndex, [...currentItems, newItem])
+  }
+
+  const removeBranchOrderItem = (branchIndex: number, itemIndex: number) => {
+    const currentItems = branchOrderItems[branchIndex] || []
+    const newItems = currentItems.filter((_, i) => i !== itemIndex)
+    updateBranchOrderItems(branchIndex, newItems)
+  }
+
+  const updateBranchOrderItem = (branchIndex: number, itemIndex: number, field: keyof OrderItem, value: any) => {
+    const currentItems = [...(branchOrderItems[branchIndex] || [])]
+    if (currentItems[itemIndex]) {
+      currentItems[itemIndex] = {
+        ...currentItems[itemIndex],
+        [field]: value
+      }
+      updateBranchOrderItems(branchIndex, currentItems)
+    }
+  }
+
   const validateStep = () => {
-    console.log('Validating step:', step);
-    console.log('Customer type:', customerType);
-    console.log('Selected company:', selectedCompany);
-    console.log('Order items:', orderItems);
-    
     const newErrors: ValidationErrors = {}
-    if (step === 3) {
-      orderItems.forEach((item, index) => {
-        if (!item.productId) newErrors[`product-${index}`] = 'יש לבחור מוצר'
-        if (item.quantity < 1) newErrors[`quantity-${index}`] = 'הכמות חייבת להיות לפחות 1'
-      })
-    } else if (step === 1) {
+    if (step === 1) {
       if (!selectedCustomer && !newCustomer.name) {
         newErrors.customer = 'יש לבחור לקוח קיים או להזין פרטי לקוח חדש'
       }
@@ -193,15 +238,25 @@ export default function NewOrder() {
         if (!branch.address) newErrors[`branchAddress-${index}`] = 'יש להזין כתובת סניף'
       })
     } else if (step === 3) {
-      orderItems.forEach((item, index) => {
+      // Validate current branch items (for multi-branch) or regular order items (for single branch)
+      const itemsToValidate = newCustomer.isMultiBranch ? getCurrentBranchItems() : orderItems
+      itemsToValidate.forEach((item, index) => {
         if (!item.productId) newErrors[`product-${index}`] = 'יש לבחור מוצר'
         if (item.quantity < 1) newErrors[`quantity-${index}`] = 'הכמות חייבת להיות לפחות 1'
       })
+      
+      // For multi-branch, also validate that at least one branch has items
+      if (newCustomer.isMultiBranch) {
+        const hasAnyItems = Object.values(branchOrderItems).some(branchItems => 
+          branchItems && branchItems.length > 0 && branchItems.some(item => item.productId)
+        )
+        if (!hasAnyItems) {
+          newErrors.submit = 'יש להוסיף מוצרים לכל הסניפים'
+        }
+      }
     }
     setErrors(newErrors)
-    const isValid = Object.keys(newErrors).length === 0
-    console.log('Validation result:', isValid, 'Errors:', newErrors)
-    return isValid
+    return Object.keys(newErrors).length === 0
   }
 
   const handleNextStep = () => {
@@ -242,7 +297,14 @@ export default function NewOrder() {
       return;
     }
 
-    if (orderItems.some(item => !item.productId)) {
+    // Check if products are selected (handle both single and multi-branch)
+    const hasProducts = newCustomer.isMultiBranch 
+      ? Object.values(branchOrderItems).some(branchItems => 
+          branchItems && branchItems.length > 0 && branchItems.some(item => item.productId)
+        )
+      : orderItems.some(item => item.productId)
+      
+    if (!hasProducts) {
       console.log('No products selected');
       setErrors({ submit: 'יש לבחור מוצרים להזמנה' });
       return;
@@ -251,12 +313,11 @@ export default function NewOrder() {
     console.log('Starting order creation...');
     setIsLoading(true);
     try {
-      let customerId = selectedCustomer;
-      console.log('Customer type:', customerType);
-      console.log('Selected customer ID:', customerId);
+      let customerTaxId: string;
+      let companyUUID = null;
       
       if (customerType === 'new') {
-        console.log('Creating new customer!');
+        customerTaxId = newCustomer.ltd; // Use the tax_id from the new customer form
         const createdCompany = await createCompany({
           "שם העסק": newCustomer.name,
           "ח.פ. או ע.מ": newCustomer.ltd,
@@ -271,11 +332,39 @@ export default function NewOrder() {
           "שם איש קשר": newCustomer.contactName,
           "נייד איש קשר": newCustomer.contactMobile,
           "מייל איש קשר": newCustomer.contactEmail,
-          "הערות": newCustomer.notes
+          "הערות": newCustomer.notes,
+          "מרובה סניפים": newCustomer.isMultiBranch
         });
+        
         if (createdCompany?.id) {
-          customerId = createdCompany.id.toString();
+          companyUUID = createdCompany.id;
+          
+          // Create branches separately if multi-branch
+          if (newCustomer.isMultiBranch && newCustomer.branches.length > 0) {
+            const createdBranches: Branch[] = [];
+            for (const branch of newCustomer.branches) {
+              if (branch.name && branch.address) {
+                const createdBranch = await createCompanyBranch({
+                  company_id: createdCompany.id,
+                  branch_name: branch.name,
+                  address: branch.address
+                });
+                if (createdBranch) {
+                  createdBranches.push({
+                    id: createdBranch.id,
+                    name: createdBranch.branch_name,
+                    address: createdBranch.address
+                  });
+                }
+              }
+            }
+            // Update newCustomer.branches with UUIDs
+            setNewCustomer(prev => ({ ...prev, branches: createdBranches }));
+          }
         }
+      } else {
+        // For existing customers, use the tax_id from selectedCompany
+        customerTaxId = selectedCompany?.["ח.פ. או ע.מ"] as string;
       }
 
       const calculateTotals = (items: OrderItem[]) => {
@@ -308,38 +397,95 @@ export default function NewOrder() {
         return totals;
       };
 
-      // Create order with proper field mapping
-      const orderData = {
-         customer_id: customerType === 'existing' ?
-           (selectedCompany?.["ח.פ. או ע.מ"] as string) :
-           customerId as string,
-         branch_index: newCustomer.isMultiBranch ? selectedBranch : undefined,
-         payment_plan: paymentPlan,
-         total_amount: Object.values(calculateTotals(orderItems)).reduce((sum, val) => sum + val, 0),
-         notes,
-         status: 'new'
-       } as NewOrderData;
-      
-      console.log('Creating order with data:', orderData);
-      const createdOrder = await createOrder(orderData);
-      console.log('Order created:', createdOrder);
-
-      if (createdOrder) {
-        console.log('Setting confirmation to true');
-        setShowConfirmation(true);
-        setTimeout(() => {
-          console.log('Hiding confirmation and redirecting');
-          setShowConfirmation(false);
-          router.push('/active-orders');
-        }, 2000);
+      // Create orders: per branch if multi-branch, else single order
+      if (newCustomer.isMultiBranch) {
+        // Multi-branch: create separate order for each branch
+        for (const [branchIndexStr, items] of Object.entries(branchOrderItems)) {
+          const branchIndex = parseInt(branchIndexStr);
+          const branchItems = items.filter(item => item.productId); // Only items with products
+          
+          if (branchItems.length === 0) continue; // Skip empty branches
+          
+          // Get the actual branch UUID
+          const branch = newCustomer.branches[branchIndex];
+          const branchId = branch?.id || null;
+          
+          const order = await createOrder({
+            customer_id: customerTaxId,
+            branch_id: branchId,
+            payment_plan: paymentPlan,
+            total_amount: Object.values(calculateTotals(branchItems)).reduce((sum, val) => sum + val, 0),
+            notes,
+            status: 'new'
+          } as NewOrderData);
+          
+          if (order && order.id) {
+            for (const item of branchItems) {
+              const product = products.find(p => p.Name === item.productId);
+              if (!product) {
+                console.error('Product not found:', item.productId);
+                continue;
+              }
+              if (!product.id) {
+                console.error('Product missing ID:', product);
+                continue;
+              }
+              const price = getProductPrice(product, paymentPlan);
+              console.log('Creating order item:', { order_id: order.id, product_id: product.id, quantity: item.quantity, unit_price: price });
+              await createOrderItem({
+                order_id: order.id,
+                product_id: product.id,
+                quantity: item.quantity,
+                unit_price: price
+              });
+            }
+          }
+        }
       } else {
-        console.log('Order creation failed');
-        setErrors({ submit: 'אירעה שגיאה ביצירת ההזמנה' });
+        // Single-branch: create one order
+        const validItems = orderItems.filter(item => item.productId);
+        
+        if (validItems.length > 0) {
+          const createdOrder = await createOrder({
+            customer_id: customerTaxId,
+            branch_id: null, // Single-branch companies don't have a specific branch
+            payment_plan: paymentPlan,
+            total_amount: Object.values(calculateTotals(validItems)).reduce((sum, val) => sum + val, 0),
+            notes,
+            status: 'new'
+          } as NewOrderData);
+          
+          if (createdOrder && createdOrder.id) {
+            for (const item of validItems) {
+              const product = products.find(p => p.Name === item.productId);
+              if (!product) {
+                console.error('Product not found:', item.productId);
+                continue;
+              }
+              if (!product.id) {
+                console.error('Product missing ID:', product);
+                continue;
+              }
+              const price = getProductPrice(product, paymentPlan);
+              console.log('Creating order item:', { order_id: createdOrder.id, product_id: product.id, quantity: item.quantity, unit_price: price });
+              await createOrderItem({
+                order_id: createdOrder.id,
+                product_id: product.id,
+                quantity: item.quantity,
+                unit_price: price
+              });
+            }
+          }
+        }
       }
+
+      setShowConfirmation(true);
+      setTimeout(() => {
+        setShowConfirmation(false);
+        router.push('/active-orders');
+      }, 2000);
     } catch (error) {
-      console.error('Full error details:', error);
-      console.error('Error message:', error?.message);
-      console.error('Error stack:', error?.stack);
+      console.error('Error creating order:', error);
       setErrors({ submit: 'אירעה שגיאה ביצירת ההזמנה. אנא נסה שנית.' });
     } finally {
       setIsLoading(false);
@@ -400,7 +546,6 @@ export default function NewOrder() {
                         onSelect={(company) => setSelectedCompany(company)}
                         onBranchUpdate={(branches) => setNewCustomer(prev => ({ ...prev, branches, isMultiBranch: true }))}
                         selectedCompany={selectedCompany}
-                        products={products}
                       />
 
                       {selectedCompany && (
@@ -681,31 +826,61 @@ export default function NewOrder() {
                   {newCustomer.isMultiBranch && (
                     <div className="space-y-2">
                       <Label htmlFor="branch">בחר סניף להתקנה</Label>
-                      <Select onValueChange={(value) => setSelectedBranch(parseInt(value))}>
+                      <Select 
+                        value={selectedBranch.toString()} 
+                        onValueChange={(value) => {
+                          const branchIndex = parseInt(value)
+                          console.log(`Switching to branch ${branchIndex}`)
+                          console.log('Current branchOrderItems:', branchOrderItems)
+                          setSelectedBranch(branchIndex)
+                          // Initialize branch items if not exists
+                          if (!branchOrderItems[branchIndex]) {
+                            console.log(`Initializing branch ${branchIndex} with empty item`)
+                            updateBranchOrderItems(branchIndex, [{ 
+                              productId: '', 
+                              quantity: 1, 
+                              id: `item-${Date.now()}` 
+                            }])
+                          }
+                        }}
+                      >
                         <SelectTrigger id="branch">
                           <SelectValue placeholder="בחר סניף" />
                         </SelectTrigger>
                         <SelectContent>
                           {newCustomer.branches.map((branch, index) => (
-                            <SelectItem key={`branch-select-${index}`} value={index.toString()}>{branch.name}</SelectItem>
+                            <SelectItem key={`branch-select-${index}`} value={index.toString()}>
+                              {branch.name || `סניף ${index + 1}`}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                   )}
 
-                  {orderItems.map((item, index) => (
+                  {getCurrentBranchItems().map((item, index) => (
                     <div key={item.id || `order-item-${index}`} className="space-y-4 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <Label htmlFor={`product-${index}`} className="text-lg font-medium">
                           מוצר {index + 1}
+                          {newCustomer.isMultiBranch && (
+                            <span className="text-sm text-muted-foreground mr-2">
+                              ({newCustomer.branches[selectedBranch]?.name || `סניף ${selectedBranch + 1}`})
+                            </span>
+                          )}
                         </Label>
                         {index > 0 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeOrderItem(index)}
+                            onClick={() => {
+                              if (newCustomer.isMultiBranch) {
+                                removeBranchOrderItem(selectedBranch, index)
+                              } else {
+                                removeOrderItem(index)
+                              }
+                            }}
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
@@ -714,7 +889,13 @@ export default function NewOrder() {
                       <div className="flex flex-col md:flex-row gap-2">
                         <div className="flex-1">
                           <Select
-                            onValueChange={(value) => updateOrderItem(index, 'productId', value)}
+                            onValueChange={(value) => {
+                              if (newCustomer.isMultiBranch) {
+                                updateBranchOrderItem(selectedBranch, index, 'productId', value)
+                              } else {
+                                updateOrderItem(index, 'productId', value)
+                              }
+                            }}
                             value={item.productId}
                           >
                             <SelectTrigger id={`product-${index}`} className="flex-1">
@@ -768,7 +949,14 @@ export default function NewOrder() {
                           placeholder="כמות"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value))}
+                          onChange={(e) => {
+                            const quantity = parseInt(e.target.value)
+                            if (newCustomer.isMultiBranch) {
+                              updateBranchOrderItem(selectedBranch, index, 'quantity', quantity)
+                            } else {
+                              updateOrderItem(index, 'quantity', quantity)
+                            }
+                          }}
                           className="w-full md:w-24"
                         />
                       </div>
@@ -784,10 +972,21 @@ export default function NewOrder() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={addOrderItem}
+                    onClick={() => {
+                      if (newCustomer.isMultiBranch) {
+                        addBranchOrderItem(selectedBranch)
+                      } else {
+                        addOrderItem()
+                      }
+                    }}
                     className="mt-4"
                   >
                     <Plus className="h-4 w-4 mr-2" /> הוסף מוצר
+                    {newCustomer.isMultiBranch && (
+                      <span className="text-sm mr-1">
+                        ל{newCustomer.branches[selectedBranch]?.name || `סניף ${selectedBranch + 1}`}
+                      </span>
+                    )}
                   </Button>
 
                   <div className="space-y-2">
@@ -822,7 +1021,12 @@ export default function NewOrder() {
             ) : (
               <Button
                 type="button"
-                disabled={isLoading || orderItems.some(item => !item.productId)}
+                disabled={isLoading || (newCustomer.isMultiBranch 
+                  ? !Object.values(branchOrderItems).some(branchItems => 
+                      branchItems && branchItems.length > 0 && branchItems.some(item => item.productId)
+                    )
+                  : orderItems.some(item => !item.productId)
+                )}
                 onClick={handleSubmit}
               >
                 {isLoading ? (

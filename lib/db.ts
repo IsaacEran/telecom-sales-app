@@ -17,7 +17,7 @@ const companyFieldMapping: Record<string, string> = {
 
 // Your database uses Hebrew column names, so no mapping needed
 export interface Company {
-  id?: number;
+  id?: string; // UUID (matching existing database)
   "שם העסק": string;
   "ח.פ. או ע.מ": string;
   "טלפון"?: string;
@@ -33,12 +33,22 @@ export interface Company {
   "מייל איש קשר"?: string;
   "הערות"?: string;
   "מרובה סניפים"?: boolean;
-  "סניפים"?: any[];
+  created_at?: string;
+}
+
+export interface CompanyBranch {
+  id?: string; // UUID
+  company_id: string;
+  branch_name: string;
+  address: string;
+  phone?: string;
+  contact_name?: string;
+  contact_phone?: string;
   created_at?: string;
 }
 
 export interface Product {
-  id?: number;
+  id?: string; // UUID (matching existing database)
   "Name": string;
   "Price"?: number;
   "Price36"?: number;
@@ -51,7 +61,7 @@ export interface Product {
 }
 
 export interface User {
-  id?: number;
+  id?: string; // UUID 
   name: string;
   email: string;
   role: string;
@@ -60,17 +70,25 @@ export interface User {
 }
 
 export interface Order {
-  id?: number;
-  company_id: string;
-  // customer_name removed; use company table for name lookup
-  branch_id?: number;
+  id?: string; // UUID
+  company_id: string; // UUID references companies(id)
+  branch_id?: string; // UUID references company_branches(id)
   payment_terms: string;
   total_amount?: number;
   notes?: string;
   status?: string;
-  // items and totals moved to order_items and orders tables separately
   created_at?: string;
   updated_at?: string;
+}
+
+// Payload type for creating orders using client keys
+export interface NewOrderData {
+  customer_id: string;
+  branch_id?: string; // UUID of branch, null for single-branch companies
+  payment_plan: string;
+  total_amount?: number;
+  notes?: string;
+  status?: string;
 }
 
 // Map order field names to database columns
@@ -123,6 +141,9 @@ export async function createCompany(company: Omit<Company, 'id' | 'created_at'>)
     console.error('Error creating company:', error)
     return null
   }
+
+  // Note: Branches are now created separately using createCompanyBranch function
+  
   return data
 }
 
@@ -155,6 +176,36 @@ export async function searchCompanies(query: string = ''): Promise<Company[]> {
     return []
   }
   return data || []
+}
+
+// Get company branches
+export async function getCompanyBranches(companyId: string): Promise<CompanyBranch[]> {
+  const { data, error } = await supabase
+    .from('company_branches')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: true })
+  
+  if (error) {
+    console.error('Error fetching company branches:', error)
+    return []
+  }
+  return data || []
+}
+
+// Create a company branch
+export async function createCompanyBranch(branch: Omit<CompanyBranch, 'id' | 'created_at'>): Promise<CompanyBranch | null> {
+  const { data, error } = await supabase
+    .from('company_branches')
+    .insert(branch)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error creating company branch:', error)
+    return null
+  }
+  return data
 }
 
 // Product functions
@@ -205,25 +256,58 @@ export async function filterProductsByCategory(category: string): Promise<Produc
 export async function createOrder(orderData: NewOrderData): Promise<Order | null> {
   console.log('Starting createOrder with data:', orderData)
   
-  // For now, let's write to the JSON file instead of Supabase
   try {
-    const orders = await import('@/data/orders.json')
-    const newOrder = {
-      id: Date.now(),
-      customer_id: orderData.customer_id,
-      branch_index: orderData.branch_index,
-      payment_plan: orderData.payment_plan,
-      total_amount: orderData.total_amount,
-      notes: orderData.notes,
-      status: orderData.status || 'pending',
-      created_at: new Date().toISOString()
+    // First, find the company UUID by tax_id (using Hebrew column name)
+    const { data: companies, error: companyError } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('"ח.פ. או ע.מ"', orderData.customer_id)
+      
+    if (companyError) {
+      console.error('Error finding company:', companyError)
+      return null
     }
     
-    console.log('Creating order in JSON:', newOrder)
+    if (!companies || companies.length === 0) {
+      console.error('No company found with tax_id:', orderData.customer_id)
+      
+      // List all companies to debug
+      const { data: allCompanies } = await supabase
+        .from('companies')
+        .select('id, "ח.פ. או ע.מ", "שם העסק"')
+      console.log('Available companies:', allCompanies)
+      
+      return null
+    }
     
-    // For now, just return the order without actually saving
-    // This will test if the order creation logic works
-    return newOrder as any
+    const company = companies[0]
+
+    // Create the order payload
+    const payload = {
+      company_id: company.id, // UUID
+      branch_id: orderData.branch_id || null, // UUID or null
+      payment_terms: orderData.payment_plan,
+      total_amount: orderData.total_amount,
+      notes: orderData.notes,
+      status: orderData.status || 'new'
+    }
+    
+    console.log('Order payload for Supabase:', payload)
+    
+    // Insert into orders table
+    const { data, error } = await supabase
+      .from('orders')
+      .insert(payload)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating order in Supabase:', error)
+      return null
+    }
+    
+    console.log('Order successfully created in Supabase:', data)
+    return data
     
   } catch (error) {
     console.error('Error in createOrder:', error)
@@ -244,7 +328,7 @@ export async function getOrders(): Promise<Order[]> {
   return data || []
 }
 
-export async function getOrder(id: number): Promise<Order | null> {
+export async function getOrder(id: string): Promise<Order | null> {
   const { data, error } = await supabase
     .from('orders')
     .select('*')
@@ -259,6 +343,41 @@ export async function getOrder(id: number): Promise<Order | null> {
 }
 
 // Utility functions
+// Order Item types and functions
+export interface OrderItemDB {
+  id?: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  created_at?: string;
+}
+
+export interface NewOrderItemData {
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+}
+
+export async function createOrderItem(item: NewOrderItemData): Promise<OrderItemDB | null> {
+  console.log('Creating order item:', item);
+  
+  const { data, error } = await supabase
+    .from('order_items')
+    .insert(item)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating order item:', error);
+    return null;
+  }
+  
+  console.log('Order item created successfully:', data);
+  return data;
+}
+
 export async function testConnection(): Promise<boolean> {
   try {
     const { data, error } = await supabase.from('companies').select('count')

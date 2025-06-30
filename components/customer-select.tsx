@@ -13,21 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 interface Branch {
   name: string;
   address: string;
-  products: {
-    id: string;
-    name: string;
-    quantity: number;
-  }[];
 }
 
 interface CustomerSelectProps {
   onSelect: (company: Company) => void;
   onBranchUpdate?: (branches: Branch[]) => void;
   selectedCompany?: Company | null;
-  products: Product[];
 }
 
-export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany, products }: CustomerSelectProps) {
+export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany }: CustomerSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(propSelectedCompany || null)
@@ -65,7 +59,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
 
 
   const addBranch = () => {
-    const newBranches = [...branches, { name: '', address: '', products: [] }]
+    const newBranches = [...branches, { name: '', address: '' }]
     setBranches(newBranches)
     onBranchUpdate?.(newBranches)
   }
@@ -78,39 +72,6 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
     onBranchUpdate?.(newBranches)
   }
 
-  const addProductToBranch = (branchIndex: number, productId: string) => {
-    const product = products.find(p => p.id?.toString() === productId || p.Name === productId) //Corrected ID lookup
-    if (!product) return
-
-    const newBranches = [...branches]
-    const branch = newBranches[branchIndex]
-
-    if (!branch.products.some(p => p.id === productId)) {
-      branch.products.push({ id: productId, name: product.Name || '', quantity: 1 })
-      setBranches(newBranches)
-      onBranchUpdate?.(newBranches)
-    }
-  }
-
-  const updateProductQuantity = (branchIndex: number, productId: string, quantity: number) => {
-    const newBranches = [...branches]
-    const branch = newBranches[branchIndex]
-    const product = branch.products.find(p => p.id === productId)
-
-    if (product) {
-      product.quantity = quantity
-      setBranches(newBranches)
-      onBranchUpdate?.(newBranches)
-    }
-  }
-
-  const removeProduct = (branchIndex: number, productId: string) => {
-    const newBranches = [...branches]
-    const branch = newBranches[branchIndex]
-    branch.products = branch.products.filter(p => p.id !== productId)
-    setBranches(newBranches)
-    onBranchUpdate?.(newBranches)
-  }
 
   const filteredCompanies = companies.filter(company =>
     company["שם העסק"].toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -196,45 +157,6 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>מוצרים</Label>
-                      <Select
-                        onValueChange={(value) => addProductToBranch(branchIndex, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="בחר מוצר" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products?.map((product) => (
-                            <SelectItem key={product.id?.toString() || product.Name} value={product.id?.toString() || product.Name}>
-                              {product.Name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="space-y-2 mt-2">
-                        {branch.products.map((product) => (
-                          <div key={product.id} className="flex items-center gap-2 p-2 border rounded">
-                            <span className="flex-grow">{product.name}</span>
-                            <Input
-                              type="number"
-                              value={product.quantity}
-                              onChange={(e) => updateProductQuantity(branchIndex, product.id, parseInt(e.target.value) || 0)}
-                              className="w-20"
-                              min="1"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeProduct(branchIndex, product.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               ))}
