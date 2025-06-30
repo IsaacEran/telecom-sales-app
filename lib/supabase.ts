@@ -18,7 +18,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   }
 })
 
-// Test the connection
-supabase.from('companies').select('count').single()
-  .then(() => console.log('Successfully connected to Supabase'))
-  .catch(err => console.error('Error connecting to Supabase:', err.message))
+// Test the connection (commented out for build)
+// supabase.from('companies').select('count').single()
+//   .then(() => console.log('Successfully connected to Supabase'))
+//   .catch(err => console.error('Error connecting to Supabase:', err.message))

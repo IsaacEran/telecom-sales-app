@@ -1,3 +1,16 @@
+import { Product } from '@/lib/db'
+import { Button } from '@/components/ui/button'
+
+type PaymentPlan = '1' | '36' | '48'
+
+interface OrderItem {
+  id: string;
+  name: string;
+  productId: string;
+  quantity: number;
+  branchIndex: number;
+}
+
 interface ContractTablesProps {
   items: OrderItem[];
   products: Product[];
@@ -6,6 +19,16 @@ interface ContractTablesProps {
 }
 
 export function ContractTables({ items, products, paymentPlan, onClose }: ContractTablesProps) {
+  const getProductPrice = (product: Product, plan: PaymentPlan) => {
+    switch (plan) {
+      case '36':
+        return product.Price36?.toString() || product.Price?.toString() || '0';
+      case '48':
+        return product.Price48?.toString() || product.Price?.toString() || '0';
+      default:
+        return product.Price?.toString() || '0';
+    }
+  };
   const tables = {
     OTC: items.filter(item => {
       const product = products.find(p => p.Name === item.productId);

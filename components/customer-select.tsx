@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getCompanies, type Company } from "@/lib/db"
+import { getCompanies, searchCompanies, type Company, type Product } from "@/lib/db"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Branch {
@@ -24,7 +24,7 @@ interface CustomerSelectProps {
   onSelect: (company: Company) => void;
   onBranchUpdate?: (branches: Branch[]) => void;
   selectedCompany?: Company | null;
-  products: Array<{ id: string; name: string; }>;
+  products: Product[];
 }
 
 export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: propSelectedCompany, products }: CustomerSelectProps) {
@@ -33,30 +33,35 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
   const [selectedCompany, setSelectedCompany] = React.useState<Company | null>(propSelectedCompany || null)
   const [isMultiBranch, setIsMultiBranch] = React.useState(false)
   const [branches, setBranches] = React.useState<Branch[]>([])
+  const [companies, setCompanies] = React.useState<Company[]>([])
+  const [loading, setLoading] = React.useState(true)
 
-  const companies = getCompanies()
-
-  // Placeholder function to fetch products -  REPLACE WITH ACTUAL DATABASE FETCH
-  const fetchProducts = async () => {
-    //  Replace with your actual database fetch logic
-    const placeholderProducts = [
-      {"🔒 Row ID": "1", Name: "Product A"},
-      {"🔒 Row ID": "2", Name: "Product B"},
-      {"🔒 Row ID": "3", Name: "Product C"}
-    ];
-    return placeholderProducts;
-  };
-
+  // Fetch companies on component mount and when search query changes
   React.useEffect(() => {
-    const getProducts = async () => {
-      const fetchedProducts = await fetchProducts();
-      // Update products state here.  Error handling may be necessary.
-      // For simplicity, I'm directly updating the products prop.
-      // In a real app, you'd manage this with a state variable and potentially handle loading/error states.
-    };
-    getProducts();
+    async function fetchCompanies() {
+      try {
+        setLoading(true)
+        const data = searchQuery 
+          ? await searchCompanies(searchQuery)
+          : await getCompanies()
+        setCompanies(data)
+      } catch (error) {
+        console.error('Error fetching companies:', error)
+        setCompanies([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    // Debounce search
+    const timeoutId = setTimeout(() => {
+      fetchCompanies()
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
-  }, []);
+  // Products are now passed as props from parent component
 
 
   const addBranch = () => {
@@ -74,14 +79,14 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
   }
 
   const addProductToBranch = (branchIndex: number, productId: string) => {
-    const product = products.find(p => p["🔒 Row ID"] === productId) //Corrected ID lookup
+    const product = products.find(p => p.id?.toString() === productId || p.Name === productId) //Corrected ID lookup
     if (!product) return
 
     const newBranches = [...branches]
     const branch = newBranches[branchIndex]
 
     if (!branch.products.some(p => p.id === productId)) {
-      branch.products.push({ id: productId, name: product.Name, quantity: 1 })
+      branch.products.push({ id: productId, name: product.Name || '', quantity: 1 })
       setBranches(newBranches)
       onBranchUpdate?.(newBranches)
     }
@@ -140,7 +145,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
           ) : (
             filteredCompanies.map((company) => (
               <div
-                key={company["🔒 Row ID"]}
+                key={company["ח.פ. או ע.מ"]}
                 className="p-2 hover:bg-gray-100 cursor-pointer"
                 onClick={() => {
                   setSelectedCompany(company)
@@ -201,7 +206,7 @@ export function CustomerSelect({ onSelect, onBranchUpdate, selectedCompany: prop
                         </SelectTrigger>
                         <SelectContent>
                           {products?.map((product) => (
-                            <SelectItem key={product["🔒 Row ID"]} value={product["🔒 Row ID"]}>
+                            <SelectItem key={product.id?.toString() || product.Name} value={product.id?.toString() || product.Name}>
                               {product.Name}
                             </SelectItem>
                           ))}

@@ -12,12 +12,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Minus, Loader2 } from 'lucide-react'
-import { readJSON, appendToJSON } from "@/lib/csvHandler"
+import { getCompanies, getProducts, createCompany, createOrder, type Company, type Product } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { Header } from '@/components/Header'
-import { ButtonProps } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customer-select"
-import { type Company } from "@/lib/db"
-import { Checkbox } from "@/components/ui/checkbox"
+import type { NewOrderData } from "@/lib/db"
+import type { NewOrderData } from "@/lib/db"
 
 interface Branch {
   name: string;
@@ -44,26 +44,10 @@ interface NewCustomer {
   branches: Branch[];
 }
 
-interface Customer {
-  id: string;
-  name: string;
-  // ... other customer fields
-}
-
-interface Product {
-  Name: string;
-  Price: string;
-  Price36: string;
-  Price48: string;
-  Description: string;
-  "Product Type": string;
-  "Product Category": string;
-  "HOT Price base": string;
-}
-
 interface OrderItem {
   productId: string;
   quantity: number;
+  id?: string; // Add unique identifier for React keys
 }
 
 interface ValidationErrors {
@@ -84,23 +68,12 @@ interface ValidationErrors {
   submit?: string;
 }
 
-type ButtonVariants = React.ComponentProps<typeof Button>
-
-interface FormElements extends HTMLFormControlsCollection {
-  customer: HTMLInputElement;
-  notes: HTMLTextAreaElement;
-}
-
-interface OrderFormElement extends HTMLFormElement {
-  readonly elements: FormElements;
-}
-
 type PaymentPlan = 'one-time' | '36' | '48';
 
 export default function NewOrder() {
   const router = useRouter()
   const [step, setStep] = useState(1)
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers] = useState<Company[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [newCustomer, setNewCustomer] = useState<NewCustomer>({
@@ -123,7 +96,11 @@ export default function NewOrder() {
     branches: [{ name: '', address: '' }]
   })
   const [selectedBranch, setSelectedBranch] = useState(0)
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([{ productId: '', quantity: 1 }])
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([{ 
+    productId: '', 
+    quantity: 1, 
+    id: `item-${Date.now()}` 
+  }])
   const [notes, setNotes] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
@@ -136,8 +113,8 @@ export default function NewOrder() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const companiesData = await readJSON("companies.json") as Customer[]
-        const productsData = await readJSON("products.json") as Product[]
+        const companiesData = await getCompanies()
+        const productsData = await getProducts()
         setCustomers(companiesData)
         setProducts(productsData)
       } catch (error) {
@@ -163,7 +140,11 @@ export default function NewOrder() {
   }
 
   const addOrderItem = () => {
-    setOrderItems([...orderItems, { productId: '', quantity: 1 }])
+    setOrderItems([...orderItems, { 
+      productId: '', 
+      quantity: 1, 
+      id: `item-${Date.now()}-${Math.random()}` 
+    }])
   }
 
   const removeOrderItem = (index: number) => {
@@ -178,12 +159,21 @@ export default function NewOrder() {
       [field]: value
     }
     setOrderItems(newOrderItems)
-    console.log('Updated order items:', newOrderItems)
   }
 
   const validateStep = () => {
+    console.log('Validating step:', step);
+    console.log('Customer type:', customerType);
+    console.log('Selected company:', selectedCompany);
+    console.log('Order items:', orderItems);
+    
     const newErrors: ValidationErrors = {}
-    if (step === 1) {
+    if (step === 3) {
+      orderItems.forEach((item, index) => {
+        if (!item.productId) newErrors[`product-${index}`] = 'יש לבחור מוצר'
+        if (item.quantity < 1) newErrors[`quantity-${index}`] = 'הכמות חייבת להיות לפחות 1'
+      })
+    } else if (step === 1) {
       if (!selectedCustomer && !newCustomer.name) {
         newErrors.customer = 'יש לבחור לקוח קיים או להזין פרטי לקוח חדש'
       }
@@ -209,7 +199,9 @@ export default function NewOrder() {
       })
     }
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const isValid = Object.keys(newErrors).length === 0
+    console.log('Validation result:', isValid, 'Errors:', newErrors)
+    return isValid
   }
 
   const handleNextStep = () => {
@@ -218,11 +210,9 @@ export default function NewOrder() {
         setErrors({ customer: 'יש לבחור לקוח' })
         return
       }
-      // Clear any previous errors
       setErrors({})
       setStep(2)
 
-      // If it's an existing customer, skip branch step
       if (customerType === 'existing') {
         setStep(3)
       }
@@ -243,32 +233,49 @@ export default function NewOrder() {
     }
   };
 
-
-  const handleSubmit = async (e: React.FormEvent<OrderFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted', { orderItems, paymentPlan });
+    console.log('Submit clicked');
 
     if (!validateStep()) {
-      console.log('Validation failed', errors);
+      console.log('Validation failed');
       return;
     }
 
     if (orderItems.some(item => !item.productId)) {
+      console.log('No products selected');
       setErrors({ submit: 'יש לבחור מוצרים להזמנה' });
       return;
     }
 
+    console.log('Starting order creation...');
     setIsLoading(true);
     try {
       let customerId = selectedCustomer;
+      console.log('Customer type:', customerType);
+      console.log('Selected customer ID:', customerId);
+      
       if (customerType === 'new') {
-        const newCustomerData = {
-          ...newCustomer,
-          id: Date.now().toString(),
-        };
-        console.log('Creating new customer:', newCustomerData); // Debug log
-        await appendToJSON("companies.json", newCustomerData);
-        customerId = newCustomerData.id;
+        console.log('Creating new customer!');
+        const createdCompany = await createCompany({
+          "שם העסק": newCustomer.name,
+          "ח.פ. או ע.מ": newCustomer.ltd,
+          "כתובת מלאה": newCustomer.address,
+          "מייל בית העסק": newCustomer.email,
+          "טלפון": newCustomer.tel1,
+          "ספק אינטרנט": newCustomer.internetProvider,
+          "סוג עסק": newCustomer.businessType,
+          "שם מורשה חתימה": newCustomer.authName,
+          "נייד מורשה חתימה": newCustomer.authMobile,
+          "מייל מורשה חתימה": newCustomer.authEmail,
+          "שם איש קשר": newCustomer.contactName,
+          "נייד איש קשר": newCustomer.contactMobile,
+          "מייל איש קשר": newCustomer.contactEmail,
+          "הערות": newCustomer.notes
+        });
+        if (createdCompany?.id) {
+          customerId = createdCompany.id.toString();
+        }
       }
 
       const calculateTotals = (items: OrderItem[]) => {
@@ -281,7 +288,7 @@ export default function NewOrder() {
         items.forEach(item => {
           const product = products.find(p => p.Name === item.productId);
           if (product) {
-            const price = parseFloat(getProductPrice(product, paymentPlan));
+            const price = getProductPrice(product, paymentPlan);
             const total = price * item.quantity;
 
             switch (product["Product Category"]) {
@@ -301,31 +308,38 @@ export default function NewOrder() {
         return totals;
       };
 
+      // Create order with proper field mapping
       const orderData = {
-        customerId: customerType === 'existing' ? selectedCompany?.["ח.פ. או ע.מ"] : customerId,
-        customerName: customerType === 'existing' ? selectedCompany?.["שם העסק"] : newCustomer.name,
-        branchIndex: newCustomer.isMultiBranch ? selectedBranch : undefined,
-        paymentPlan,
-        items: orderItems.map(item => ({
-          ...item,
-          price: getProductPrice(products.find(p => p.Name === item.productId)!, paymentPlan)
-        })),
-        totals: calculateTotals(orderItems),
-        notes,
-        date: new Date().toISOString(),
-        status: 'new'
-      };
+         customer_id: customerType === 'existing' ?
+           (selectedCompany?.["ח.פ. או ע.מ"] as string) :
+           customerId as string,
+         branch_index: newCustomer.isMultiBranch ? selectedBranch : undefined,
+         payment_plan: paymentPlan,
+         total_amount: Object.values(calculateTotals(orderItems)).reduce((sum, val) => sum + val, 0),
+         notes,
+         status: 'new'
+       } as NewOrderData;
+      
+      console.log('Creating order with data:', orderData);
+      const createdOrder = await createOrder(orderData);
+      console.log('Order created:', createdOrder);
 
-      console.log('Submitting order data:', orderData);
-      await appendToJSON("orders.json", orderData);
-
-      setShowConfirmation(true);
-      setTimeout(() => {
-        setShowConfirmation(false);
-        router.push('/orders');
-      }, 2000);
+      if (createdOrder) {
+        console.log('Setting confirmation to true');
+        setShowConfirmation(true);
+        setTimeout(() => {
+          console.log('Hiding confirmation and redirecting');
+          setShowConfirmation(false);
+          router.push('/active-orders');
+        }, 2000);
+      } else {
+        console.log('Order creation failed');
+        setErrors({ submit: 'אירעה שגיאה ביצירת ההזמנה' });
+      }
     } catch (error) {
-      console.error('Error creating order:', error);
+      console.error('Full error details:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
       setErrors({ submit: 'אירעה שגיאה ביצירת ההזמנה. אנא נסה שנית.' });
     } finally {
       setIsLoading(false);
@@ -335,31 +349,31 @@ export default function NewOrder() {
   const filteredProducts = (searchTerm: string) => {
     return products.filter(product =>
       product.Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product["Product Type"].toLowerCase().includes(searchTerm.toLowerCase())
+      product["Product Type"]?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }
 
-  const getProductPrice = (product: Product, plan: PaymentPlan) => {
+  const getProductPrice = (product: Product, plan: PaymentPlan): number => {
     switch (plan) {
       case '36':
-        return product.price36;
+        return product.Price36 ?? product.Price ?? 0;
       case '48':
-        return product.price48;
+        return product.Price48 ?? product.Price ?? 0;
       default:
-        return product.Price;
+        return product.Price ?? 0;
     }
   };
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <Header title="הזמנה חדשה" backUrl="/dashboard" />
+      <Header title="הזמנה חדשה" backUrl="/" />
       <main className="container mx-auto p-4">
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle>יצירת הזמנה חדשה - שלב {step} מתוך 3</CardTitle>
           </CardHeader>
           <CardContent>
-            <form id="orderForm" onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {step === 1 && (
                 <>
                   <div className="space-y-2">
@@ -386,6 +400,7 @@ export default function NewOrder() {
                         onSelect={(company) => setSelectedCompany(company)}
                         onBranchUpdate={(branches) => setNewCustomer(prev => ({ ...prev, branches, isMultiBranch: true }))}
                         selectedCompany={selectedCompany}
+                        products={products}
                       />
 
                       {selectedCompany && (
@@ -502,7 +517,7 @@ export default function NewOrder() {
                           <div className="space-y-4 border p-4 rounded">
                             <h3 className="font-semibold">סניפים</h3>
                             {newCustomer.branches.map((branch, index) => (
-                              <div key={index} className="space-y-2">
+                              <div key={`branch-${index}`} className="space-y-2">
                                 <Label>סניף {index + 1}</Label>
                                 <Input
                                   placeholder="שם הסניף"
@@ -637,7 +652,7 @@ export default function NewOrder() {
                 <>
                   <h3 className="text-lg font-semibold">פרטי סניפים</h3>
                   {newCustomer.branches.map((branch, index) => (
-                    <div key={index} className="space-y-2 border p-4 rounded">
+                    <div key={`step2-branch-${index}`} className="space-y-2 border p-4 rounded">
                       <Label htmlFor={`branchName-${index}`}>שם הסניף</Label>
                       <Input
                         id={`branchName-${index}`}
@@ -672,7 +687,7 @@ export default function NewOrder() {
                         </SelectTrigger>
                         <SelectContent>
                           {newCustomer.branches.map((branch, index) => (
-                            <SelectItem key={index} value={index.toString()}>{branch.name}</SelectItem>
+                            <SelectItem key={`branch-select-${index}`} value={index.toString()}>{branch.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -680,7 +695,7 @@ export default function NewOrder() {
                   )}
 
                   {orderItems.map((item, index) => (
-                    <div key={index} className="space-y-4 p-4 border rounded-lg">
+                    <div key={item.id || `order-item-${index}`} className="space-y-4 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <Label htmlFor={`product-${index}`} className="text-lg font-medium">
                           מוצר {index + 1}
@@ -715,9 +730,9 @@ export default function NewOrder() {
                                 />
                               </div>
                               <div className="max-h-[300px] overflow-y-auto">
-                                {filteredProducts(productSearch).map((product) => (
+                                {filteredProducts(productSearch).map((product, productIndex) => (
                                   <SelectItem
-                                    key={product.Name}
+                                    key={`${product.id ?? product.Name}-${index}-${productIndex}`}
                                     value={product.Name}
                                     className="py-3"
                                   >
@@ -806,15 +821,9 @@ export default function NewOrder() {
               </Button>
             ) : (
               <Button
-                type="submit"
-                form="orderForm"
+                type="button"
                 disabled={isLoading || orderItems.some(item => !item.productId)}
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('Submit clicked');
-                  const form = document.getElementById('orderForm') as HTMLFormElement;
-                  form.dispatchEvent(new Event('submit', { cancelable: true }));
-                }}
+                onClick={handleSubmit}
               >
                 {isLoading ? (
                   <>
