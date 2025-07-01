@@ -76,6 +76,19 @@ export default function ProductsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
               <Card key={product.id || product.Name} className="hover:shadow-lg transition-shadow">
+                {product["Product pic"] && (
+                  <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                    <img
+                      src={product["Product pic"]}
+                      alt={product.Name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
                 <CardHeader>
                   <CardTitle className="text-lg">{product.Name}</CardTitle>
                   {product["Product Category"] && (

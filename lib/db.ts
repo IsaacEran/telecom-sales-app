@@ -57,6 +57,7 @@ export interface Product {
   "Product Type"?: string;
   "Product Category"?: string;
   "HOT Price base"?: number;
+  "Product pic"?: string;
   created_at?: string;
 }
 

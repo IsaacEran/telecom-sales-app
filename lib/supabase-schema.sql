@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   "Product Type" VARCHAR,
   "Product Category" VARCHAR,
   "HOT Price base" NUMERIC(10,2),
+  "Product Pic" TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
