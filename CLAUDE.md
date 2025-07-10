@@ -14,9 +14,19 @@ npm run build
 # Start production server
 npm start
 
-# Create sample data
+# Create sample data (populates JSON files)
 npm run create-data
+
+# Migrate data from JSON to Supabase
+npm run migrate
 ```
+
+## Development Setup
+
+1. Copy `.env.local.example` to `.env.local` and configure Supabase credentials
+2. Run `npm install` to install dependencies
+3. Use `npm run create-data` to generate sample data for development
+4. Start development server with `npm run dev`
 
 ## Architecture Overview
 
@@ -103,3 +113,30 @@ This is a **Next.js 14 telecom sales management system** with Hebrew RTL support
 - Tables: companies, company_branches, products, orders, order_items, installations
 - Schema definition: `lib/supabase-schema.sql`
 - Migration between JSON and Supabase handled in data access layer
+
+**Environment Variables Required**:
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key for client operations
+
+**Database Connection**:
+- Supabase client configured in `lib/supabase.ts`
+- Connection test available via `testConnection()` function in `lib/db.ts`
+- Companies table uses Hebrew column names for business compatibility
+
+## Technical Configuration
+
+**TypeScript Configuration**:
+- Uses `@/*` path mapping for imports
+- Strict mode enabled with bundler module resolution
+- Next.js plugin configured for app directory
+
+**Styling Configuration**:
+- Tailwind CSS with custom theme extending shadcn/ui colors
+- CSS variables for theming support (`--primary`, `--secondary`, etc.)
+- Dark mode support with class-based toggle
+- RTL-optimized layout patterns
+
+**Next.js Configuration**:
+- Custom webpack config disables `fs` and `path` modules for client-side
+- ES modules configured via `"type": "module"` in package.json
+- App Router architecture with TypeScript support
